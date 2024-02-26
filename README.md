@@ -25,7 +25,7 @@ Example: <br>
     user = 12345
     password = "passwd123"
     server = "MetaQuotes-Demo"
-    conn = Manipulation(user,password,server)
+    conn = MT5(user,password,server)
 
 </p>
 
@@ -141,31 +141,34 @@ The method will return the informartion from the current time less the hours sel
 Example: <br>
     
     #Return a dataFrame and plot it
-    ranges = bars.data_range("EURUSD","M1",4,1)      
+    ranges = MT5.data_range("EURUSD","M1",4,1)      
 
 To check the correct timeframes print the next code:
 
     print(MT5.timeframes)
 
-In this example the name of the stock was passed manual, remember use the aproppiate method to extract the name exactly.
+In this example the name of the stock was passed manually, remember use the aproppiate method to extract the name exactly.
 </p>
 
 
-# Technical Methods
-This file contains multiple types of technical analysis, it is based in TA-Lib and modified for personal use with extra features.
+# Technical
+Contains multiple types of technical analysis, it is based in TA-Lib and modified for personal use with extra features.
 To know more information about the functions of TA-Lib, please refer the next documentation:
 https://mrjbq7.github.io/ta-lib/index.html
 
-<h3><b>EMA(entry = "close", period = 12)</b></h3>
+<h3><b>EMA(entry = "close", period = 12, deviation=-1)</b></h3>
 <p>Calculate the values for an exponential moving average, by default is set up to 12 periods and close prices.
 
 The method only returns the last value of the EMA.
 
 Example: <br>
         
+    from technical import EMA
     # Calculate the last value of the EMA  based on the open price and 9 periods.    
-    EMA = analyze.EMA("open",9)
+    EMA = EMA("open",9)
 </p>
+
+
 
 
 

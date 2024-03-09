@@ -126,12 +126,14 @@ class MT5:
 
         # Display the opened positions
 
-    def get_positions(self, show=1,s=None):
+    def get_positions(self, show=1,s=None,id=None):
         """
             Get the positions opened to extract the info and close it with the function below
         """
         if s is not None:
             info_position = mt5.positions_get(symbol=s)
+        elif id is not None:
+            info_position = mt5.positions_get(ticket=id)
         else:
             info_position = mt5.positions_get()                    
 
@@ -148,7 +150,7 @@ class MT5:
         return df
 
     # Send request to open a position
-    def open_position(self,symbol,operation,lot,pips=40,comment="Python"):
+    def open_position(self,symbol,operation,lot,points=40,comment="Python"):
         """
             This method send the request to open a position with the paramateres
         """        
@@ -174,8 +176,8 @@ class MT5:
             "volume": lot,     
             "type": mt5.ORDER_TYPE_BUY if operation == 1 else  mt5.ORDER_TYPE_SELL,
             "price": price,
-            "tp": price + (10*pips) * point if operation == 1 else price - (10*pips) * point,
-            "sl": price - (7.5*pips) * point if operation == 1 else price + (7.5*pips) * point,
+            "tp": price + (points) * point if operation == 1 else price - (points) * point,
+            "sl": price - (points) * point if operation == 1 else price + (points) * point,
             "deviation": deviation,
             #"magic": 234000,
             "comment": comment,
@@ -199,7 +201,7 @@ class MT5:
                                                                            
         return symbol,np.int64(result.order)
     # Send request to close position
-    def close_position(self, stock, ticket, type_order, vol, comment="Close"):
+    def close_position(self, stock, ticket, type_order, vol, comment="Close",display=False):
         if (type_order == 1):
             request_close = {
                 "action": mt5.TRADE_ACTION_DEAL,
@@ -232,10 +234,10 @@ class MT5:
                 "type_filling": mt5.ORDER_FILLING_IOC,  # mt5.ORDER_FILLING_RETURN,
             }
             result = mt5.order_send(request_close)
-            print(result)
+            if display:
+                print(result)
 
-            # Get data for the selected symbols and timeframe
-
+    # Get data for the selected symbols and timeframe
     def data_range(self, symbol, temp, times, plot=0):
         self.utc_to = dt.datetime.now(tz=self.timezone) + dt.timedelta(hours=8)
         self.utc_from = self.utc_to - dt.timedelta(minutes=times)

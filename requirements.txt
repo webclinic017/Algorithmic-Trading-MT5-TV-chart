@@ -84,7 +84,7 @@ six==1.16.0
 sklearn==0.0
 soupsieve==2.5
 stack-data==0.6.2
-TA-Lib /TA_Lib-0.4.24-cp39-cp39-win_amd64.whl
+TA-Lib TA_Lib-0.4.24-cp39-cp39-win_amd64.whl
 threadpoolctl==3.2.0
 tinycss2==1.2.1
 tomli==2.0.1

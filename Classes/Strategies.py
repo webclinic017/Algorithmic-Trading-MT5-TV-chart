@@ -1,7 +1,6 @@
 import pandas as pd
 from Classes.MT5 import MT5
 from Classes.data_operations import *
-from Classes.model_operations import send_data
 from time import sleep
 
 # Parameteters for strategy (not modify)

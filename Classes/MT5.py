@@ -46,36 +46,36 @@ class MT5:
         self.user = user
         self.password = password
         self.server = server
+        self.connection_state = False
         self.start()        
 
     def start(self):
         user = self.user
         password = self.password
-        server = self.server
+        server = self.server       
         # Establish MetaTrader 5 connection to a specified trading account
-        if not mt5.initialize(login=user, server=server, password=password):
-            print("initialize() failed, error code =", mt5.last_error())
-            quit()
-
-        # Display data on connection status, server name and trading account
+        if not mt5.initialize(login=user, server=server, password=password):            
+            self.error = mt5.last_error()
+            print("initialize() failed, error code =", self.error)            
+            quit()            
         print("Successfully Connection! \n")
+        self.connection_state = True        
+        
 
-        # Get the balace from the account
-
-    def account(self, show=0):
-        authorized = mt5.login(self.user, password=self.password, server=self.server)
-        if authorized:
-            account_info_dict = mt5.account_info()._asdict()
-            # convert the dictionary into DataFrame and print
-            df = pd.DataFrame(list(account_info_dict.items()), columns=['property', 'value'])
-        else:
+    # Get object with all details
+    def account_details(self, show=0):
+        # authorized = mt5.login(self.user, password=self.password, server=self.server)
+        # if authorized:
+        try:
+            account_info = mt5.account_info()            
+        except:
             print("failed to connect at account #{}, error code: {}".format(self.user, mt5.last_error()))
 
         if show != 0:
-            print(df.iloc[24:].reset_index(drop=True))
+            print(account_info)
 
-        # Return balance account
-        return float(df["value"].iloc[10])
+        # Account object
+        return account_info
 
     # Display all available symbols with the spread passed
     def display_symbols(self, elements, sprd=3):
@@ -122,17 +122,16 @@ class MT5:
                 return df
             except:
                 print("Error in get deals!")
-        return pd.DataFrame()
-
-        # Display the opened positions
-
+        return pd.DataFrame()    
+        
+        
     def get_positions(self, show=1,s=None,id=None):
         """
             Get the positions opened to extract the info and close it with the function below
         """
-        if s is not None:
+        if s is not None and id is None:
             info_position = mt5.positions_get(symbol=s)
-        elif id is not None:
+        elif id is not None and s is None:
             info_position = mt5.positions_get(ticket=id)
         else:
             info_position = mt5.positions_get()                    
@@ -190,16 +189,16 @@ class MT5:
         print("1. order_send(): by {} {} lots at {} with deviation={} points".format(symbol,lot,price,deviation))        
         if result is None:
             print("2. order_send failed, no response received")
-            return symbol,0
+            return 0
         elif result.retcode != mt5.TRADE_RETCODE_DONE:                                                   
             print("2. order_send failed, retcode={}".format(result.retcode))
             if result.retcode == 10031:
                 print("Trade Server connection lost")                
             # request the result as a dictionary and display it element by element
             #result_dict=result._asdict()    
-            return symbol,0
+            return 0
                                                                            
-        return symbol,np.int64(result.order)
+        return np.int64(result.order)
     # Send request to close position
     def close_position(self, stock, ticket, type_order, vol, comment="Close",display=False):
         if (type_order == 1):

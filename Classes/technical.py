@@ -1,7 +1,6 @@
 import talib as ta
 from math import atan2, pi
 import pandas as pd
-import pandas_ta as pd_ta
 import numpy as np
 import warnings
 warnings.filterwarnings("ignore")
@@ -41,7 +40,7 @@ class Technical:
                 directions.append(1)
             elif df.loc[bar]["open"] > df.loc[bar]["close"]:
                 # Bearish bar
-                directions.append(0)
+                directions.append(-1)
             else:
                 # Doji bar
                 directions.append(2)

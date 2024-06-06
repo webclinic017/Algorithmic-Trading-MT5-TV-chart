@@ -193,11 +193,13 @@ class MT5:
         elif result.retcode != mt5.TRADE_RETCODE_DONE:                                                   
             print("2. order_send failed, retcode={}".format(result.retcode))
             if result.retcode == 10031:
-                print("Trade Server connection lost")                
+                print("Trade Server connection lost")  
+            elif result.retcode == 10019:
+                print("Lack of free margin to execute the Order")                                 
+                return 10019
             # request the result as a dictionary and display it element by element
             #result_dict=result._asdict()    
-            return 0
-                                                                           
+            return 0                                                                           
         return np.int64(result.order)
     # Send request to close position
     def close_position(self, stock, ticket, type_order, vol, comment="Close",display=False):
@@ -251,9 +253,19 @@ class MT5:
         if not plot == 0:
             mpl.plot(rates_frame, type="candle", style="classic", title=str(symbol + " " + temp))
         return rates_frame
-
+    def calculate_profit(self,symbol,points,lot,order):                
+        point=mt5.symbol_info(symbol).point
+        symbol_tick=mt5.symbol_info_tick(symbol)
+        ask=symbol_tick.ask
+        bid=symbol_tick.bid        
+        if order == 1:
+            profit=mt5.order_calc_profit(mt5.ORDER_TYPE_BUY,symbol,lot,ask,ask+points*point)                    
+        else:
+            profit=mt5.order_calc_profit(mt5.ORDER_TYPE_SELL,symbol,lot,bid,bid-points*point)
+        return profit
     # Close the connection with MT5
     def close(self):
         mt5.shutdown()
         print("Closed Connection!")        
-        
+    
+    

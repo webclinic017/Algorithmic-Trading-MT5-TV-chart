@@ -107,8 +107,7 @@ def TRAILLING_STOP(s,order,tickets,conn, points,profit,risk,pnl,apply_both_direc
         decimal_places = len(str(tp).split(".")[1])
         price_open = df["price_open"].iloc[0]                     
     counter = 0    
-    counter_sl = 0
-    tickets_pop = []    
+    counter_sl = 0    
     while not flag_to_stop.is_set() and df.shape[0] > 0:
         current_price =  conn.data_range(s, "M1", 1)["close"].iloc[0]      
         current_pl = conn.account_details().profit + pnl
@@ -117,8 +116,9 @@ def TRAILLING_STOP(s,order,tickets,conn, points,profit,risk,pnl,apply_both_direc
         if apply_both_directions:
             difference = abs(difference)
         # Every 3 min randomly choose if update or not in case the difference is not positive 
-        elif counter_sl == 180:           
+        elif counter_sl == 180:                
             difference = choice([difference,abs(difference)])
+            print("Randomly updated: ", difference > 0)       
             counter_sl = 0
         # Move the SL by n points        
         if symbol_points < difference and counter < limit:
@@ -127,29 +127,34 @@ def TRAILLING_STOP(s,order,tickets,conn, points,profit,risk,pnl,apply_both_direc
             counter += 1
             try:
                 # Close partial trades when positions are greater than 1 otherwise update SL
-                if len(tickets) > 1 and (price_open < current_price if order == 1 else price_open > current_price) and partial_close:
-                    ticket_to_pop = tickets.pop()
-                    conn.close_position(s, ticket_to_pop, order, volume, comment="Partial Close")                
-                    tickets_pop.append(ticket_to_pop)
+                if len(tickets) > 1 and (price_open < current_price if order == 1 else price_open > current_price) and partial_close:                    
+                    for ticket_to_close in tickets:
+                        if ticket_to_close != 10019:          
+                            conn.close_position(s, ticket_to_close, order, volume, comment="Partial Close")                                    
+                            tickets.remove(ticket_to_close)
+                            break
                     print("Partial Close")
-                if dynamic_sl:
-                    # Always update in the trend direction
+                # Update in the trend direction the rest of the positions
+                if dynamic_sl:                    
                     if (order == 1 and new_sl > sl) or (order == 0 and new_sl < sl):                                            
                         # Update SL
                         for ticket in tickets:
-                            modify(ticket,new_sl,tp)                
+                            if ticket != 10019:
+                                modify(ticket,new_sl,tp)                
             except Exception as e:
-                pass       
+                pass                
         # Check if the risk/profit is reached in active order close trades and close session
         if current_pl >= profit or current_pl <= risk:
-            flag_to_stop.set()
+            print("Session will be closed due limit of profit/risk was achieved")
+            flag_to_stop.set()        
         # Update Trailling Stop with half of current porints in both directions
-        if counter >= limit and not second_trailling:                  
+        if counter >= limit and not second_trailling and not conn.get_positions(0,s=s).empty:                  
             print("SECOND TRAILLING STOP")
-            TRAILLING_STOP(s,order,tickets,conn, points / 2,profit=profit,risk=risk,pnl=pnl,apply_both_directions=True,limit=len(tickets),flag_to_stop=flag_to_stop,second_trailling=True)
+            # Update only in signal trend
+            TRAILLING_STOP(s,order,tickets,conn, points / 2,profit=profit,risk=risk,pnl=pnl,apply_both_directions=False,limit=len(tickets),flag_to_stop=flag_to_stop,second_trailling=True)
         counter_sl += 1
         if conn.get_positions(0,s).empty:
-            print("Position Closed")
+            print("Position Closed")            
             break
         sleep(1)    
                       

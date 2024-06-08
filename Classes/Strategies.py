@@ -113,7 +113,8 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
         except Exception as e:
             print("Data range failed:", e)
             break
-        if not positions_open(conn,symbol_to_trade) and not flag_session.is_set():
+        # Avoid open positions when the profit/risk was acheived
+        if not positions_open(conn,symbol_to_trade) and (total_profit >= target_profit) or (total_profit <= risk):
             # Open positions if the stratgy detects entries
             position, entry = EMA_CROSSING(df=M1,offset= OFFSET, ema_open=FINAL_EMA_OPEN,ema_period= FINAL_EMA_LH,reverse=reverse_entries)        
             if position:      

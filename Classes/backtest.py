@@ -1,7 +1,6 @@
 from Classes.data_operations import *
 from Classes.Strategies import *
 import numpy as np
-import matplotlib.pyplot as plt
 import concurrent.futures
 
 
@@ -172,30 +171,19 @@ def optimize_strategy(conn, n_periods, symbol):
     """
 
     best_result = None
-    best_points = None
-    best_reverse = False
-    best_volume_filter = False
+    best_points = None    
     points_range = DEFAULT_RANGE(symbol)
-
-    futures = []
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        for points in points_range:
-            for reverse in [False, True]:
-                for volume_filter in [False, True]:
-                    future = executor.submit(backtest_and_analyze, conn, n_periods, symbol, reverse, points, volume_filter)
-                    futures.append((future, points, reverse, volume_filter))
-
-        for future, points, reverse, volume_filter in futures:
-            result_metric = future.result()
-            if best_result is None or result_metric > best_result:
-                best_result = result_metric
-                best_points = points
-                best_reverse = reverse
-                best_volume_filter = volume_filter
-
+    results = []    
+    for points in points_range:           
+        win_rate = backtest_and_analyze(conn, n_periods, symbol, False, points, False)
+        results.append((win_rate, points))
+ 
+    for win_rate,points in results:
+        if best_result is None or win_rate > best_result:
+            best_result = win_rate
+            best_points = points
     return {
         "best_points": best_points,
         "best_result": best_result,
-        "reverse": best_reverse,
-        "volume_filter": best_volume_filter
+        
     }

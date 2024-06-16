@@ -43,7 +43,7 @@ class App(customtkinter.CTk):
         # This function will be called when the user tries to close the window
         if messagebox.askokcancel("Quit", "Do you want to quit?"):
             if not self.stop_thread_flag.is_set():
-                self.stop_thread_flag.set()
+                self.stop_session()
             # If the user confirms, destroy the window
             self.destroy()
    
@@ -183,22 +183,31 @@ class App(customtkinter.CTk):
         # self.reverse = self.bestparameters["reverse"]
         self.positions_entry = int(self.main_frame.positions_entry.get())    
         self.points = round(int(self.main_frame.points_entry.get()),2)
-        # self.points = round(int(self.bestparameters["best_points"]),2)
-        try:
-            self.apply_both_directions = self.main_frame.partial_close_directions_menu.get() == "Enable"
-        except:
-            self.apply_both_directions = False      
+        # self.points = round(int(self.bestparameters["best_points"]),2)            
         self.lots = float(self.main_frame.lots_entry.get())  
+        self.fibonacci = self.main_frame.fibonacci_options.get() == "Enable"
         if self.stop_thread_flag.is_set():
             self.stop_thread_flag.clear()
         self.close_postions_flag = threading.Event()
         # Create new thread with the strategy        
         self.strategy_thread = threading.Thread(target=main_loop,
-                                                args=(self,self.connection,self.symbol,self.partial_close,
-                                                      self.risk,self.profit,self.positions_entry,
-                                                        self.max_trades,"M1",self.stop_thread_flag,
-                                                      self.close_postions_flag,self.points,self.lots,
-                                                      self.apply_both_directions,self.dynamic_sl,self.reverse))             
+                                                args=(self,
+                                                      self.connection,
+                                                      self.symbol,
+                                                      self.partial_close,
+                                                      self.risk,self.profit,
+                                                      self.positions_entry,
+                                                      self.max_trades,
+                                                      "M1",
+                                                      self.stop_thread_flag,
+                                                      self.close_postions_flag,
+                                                      self.points,
+                                                      self.lots,
+                                                      True,
+                                                      self.dynamic_sl,
+                                                      self.reverse,
+                                                      self.fibonacci                                                    
+                                                      ))             
         
         strategy_running_screen(self)                
             

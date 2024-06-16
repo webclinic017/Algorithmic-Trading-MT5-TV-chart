@@ -1,6 +1,6 @@
 from Classes.technical import Technical
 import MetaTrader5 as mt5
-from time import sleep,time
+from time import sleep
 import numpy as np
 from collections import Counter
 from random import choice
@@ -36,8 +36,10 @@ def SEND_REQUEST_OPEN(s, order, lotaje=0.5, MT5=0, n=5):
     """
     
     tickets = []
-    print("****************** BUY ******************") if order == 1 else print(
-        "****************** SELL ******************")
+    if order == 1:        
+        print("****************** BUY ******************") 
+    else: 
+        print("****************** SELL ******************")
     if s == "XAUUSD":
         lotaje = round(lotaje * 1.5, 2)
         points = 40
@@ -156,15 +158,14 @@ def TRAILLING_STOP(s,order,tickets,conn, points,profit,risk,pnl,apply_both_direc
         if conn.get_positions(0,s).empty:
             print("Position Closed")            
             break
-        sleep(1)    
-                      
-# Monitor the entries to close if needed    
-def POSITIONS_MONITORING(s, order, tickets, conn,points,percentage_distance):    
+        sleep(1)                          
+
+# Adjust the SL every time the price moves certain points 
+def TRAILLING_STOP_FIBONACCI(s,order,tickets,conn,levels,profit,risk,pnl,flag_to_stop=False,partial_close=False,dynamic_sl=True):
     """
-        Monitor the open trade to close the position if needed.
-        When the price reach a distance to the TP but start moving in opposite side the positions will be closed to prevent loss and keep profit        
+        Adjust the SL based on the Fibonacci levels
     """
-     # Internal use
+    # Internal use
     def modify(ticket, sl_, tp_,show=False):
         request = {
             "action": mt5.TRADE_ACTION_SLTP,
@@ -174,39 +175,95 @@ def POSITIONS_MONITORING(s, order, tickets, conn,points,percentage_distance):
         }
         boolean = False
         result = mt5.order_send(request)
-        if result.retcode == mt5.TRADE_RETCODE_DONE:
-            # print(f'New {comment}: {sl_ if comment == "SL" else tp_}')
-            boolean = True
-        else:
-            if show:
-                print(f'Order failed, retcode: {result.retcode}')
-            boolean = False
-        return boolean
+        try:
+            if result.retcode == mt5.TRADE_RETCODE_DONE:
+                # print(f'New {comment}: {sl_ if comment == "SL" else tp_}')
+                boolean = True
+            else:
+                if show:
+                    print(f'Order failed, retcode: {result.retcode}')
+                boolean = False
+        except Exception as e:
+            pass
+        return boolean    
     
-    # Initialize variables
-    df = conn.get_positions(0,s=s)         
-    tp = df["tp"].iloc[0]  
-    volume = df["volume"].iloc[0]
-    decimal_places = len(str(tp).split(".")[1])      
-    price_open = df["price_open"].iloc[0]   
-    limit_flag = False
-    point = mt5.symbol_info(s).point          
-    points = points * point 
-    price_limit = price_open + (points * percentage_distance) if order == 1 else tp + (points * percentage_distance)
-    trend_condition = lambda price,order: price >= price_limit if order == 1 else price <= price_limit    
-    while not conn.get_positions(0,s=s).empty:       
-        current_price =  conn.data_range(s, "M1", 1)["close"].iloc[0]         
-        if not limit_flag and trend_condition(current_price,order):            
-            print("Positions inside the zone SL will be adjusted")
-            limit_flag = True
-            new_sl = round(current_price - (points * (percentage_distance * .25)),decimal_places) if order == 1 else round(current_price + (points * (percentage_distance * .25)),decimal_places)
-            for ticket in tickets:
-                request_done = False
-                while not request_done and not conn.get_positions(0,s=s).empty:                                
-                    request_done = modify(ticket,new_sl,tp,True)
-            print("SL Asjusted")                    
-        sleep(1)        
-
+    point = mt5.symbol_info(s).point      
+    df = conn.get_positions(0,s=s)    
+    if df.shape[0] > 0:    
+        volume = df["volume"].iloc[0]       
+        tp = df["tp"].iloc[0]       
+        decimal_places = len(str(tp).split(".")[1])
+        price_open = df["price_open"].iloc[0]                     
+    # Calculate the intermediates levels
+    if order == 1:        
+        tp1 = round(price_open + levels[38.2], decimal_places)
+        tp2 = round(price_open + levels[50], decimal_places)        
+    else:
+        tp1 = round(price_open - levels[38.2], decimal_places)    
+        tp2 = round(price_open - levels[50], decimal_places)   
+    # Define SL values to use once the tp are reached
+    sl1 = price_open
+    sl2 = tp1
+    tp1_triggered = False
+    tp2_triggered = False
+    tp1_partial = False
+    tp2_partial = False
+    # Loop until the trade is closed
+    while not flag_to_stop.is_set() and df.shape[0] > 0:
+        current_price =  conn.data_range(s, "M1", 1)["close"].iloc[0]      
+        current_pl = conn.account_details().profit + pnl
+        try: 
+            # If partial close was enabled close one trade per case
+            if partial_close and (not tp1_partial or not tp2_partial):            
+                if tp1_triggered and not tp1_partial:
+                    tp1_partial = True
+                    if len(tickets) > 1:
+                        ticket_to_close = tickets.pop()                                    
+                        if ticket_to_close != 10019:          
+                            conn.close_position(s, ticket_to_close, order, volume, comment="Partial Close")                                                                                    
+                        print("Partial Close") 
+                elif tp2_triggered and not tp2_partial:
+                    tp2_partial = True
+                    if len(tickets) > 1:
+                        ticket_to_close = tickets.pop()                                    
+                        if ticket_to_close != 10019:          
+                            conn.close_position(s, ticket_to_close, order, volume, comment="Partial Close")                                                                                    
+                        print("Partial Close") 
+            # Update the TP/SL if dynamic Sl was enabled
+            if dynamic_sl:                            
+                # TP1 -> BUY signals
+                if order == 1 and current_price >= tp1 and not tp1_triggered:                
+                    for ticket in tickets:
+                        if ticket != 10019:
+                            modify(ticket,sl1,tp)
+                    tp1_triggered = True
+                # TP2 -> BUY signals
+                elif order == 1 and current_price >= tp2 and not tp2_triggered:                                
+                    for ticket in tickets:
+                        if ticket != 10019:
+                            modify(ticket,sl2,tp)
+                    tp2_triggered = True
+                # TP1 -> SELL signals
+                elif order == 0 and current_price <= tp1 and not tp1_triggered:                                
+                    for ticket in tickets:
+                        if ticket != 10019:
+                            modify(ticket,sl1,tp)                        
+                    tp1_triggered = True
+                # TP2 -> SELL signals
+                elif order == 0 and current_price <= tp2 and not tp2_triggered:                                
+                    for ticket in tickets:
+                        if ticket != 10019:
+                            modify(ticket,sl2,tp)                        
+                    tp2_triggered = True                                                                                            
+        except Exception as e:
+            print(e)
+        # Check if the risk/profit is reached in active order close trades and close session
+        if current_pl >= profit or current_pl <= risk:
+            print("Session will be closed due limit of profit/risk was achieved")
+            flag_to_stop.set()                        
+        df = conn.get_positions(0,s) 
+        sleep(1)     
+    print("Position Closed")                
 # Check for Crossing betewen the 2 MA provided
 def CROSSING(first_series, second_series, crossing):
     """"

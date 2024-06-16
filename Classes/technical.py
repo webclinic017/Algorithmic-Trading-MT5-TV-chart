@@ -212,39 +212,12 @@ class Technical:
         ANGLE = atan2((Y2 - Y1), 0.10) * 180 / pi
         return ANGLE
 
-    # Range of Highest value over a specified period
-    def HIGHEST(self):
-        df = self.df
-        highest_close = ta.MAX(df["close"], timeperiod=2)
-        highest_high = ta.MAX(df["high"], timeperiod=2)
-        high_list = [highest_close, highest_high]
-        cols = ["close", "high"]
-        df = pd.DataFrame(high_list)
-        df = df.transpose()
-        df.columns = cols
-        df.reset_index(inplace=True)
-        index = int(df["close"].idxmax())
-        index2 = int(df["high"].idxmax())
-        metrics = [np.float64(df["close"].max()), df["time"].iloc[index], np.float64(
-            df["high"].max()), df["time"].iloc[index2]]
-        return metrics
-
-    # Range of Highest value over a specified period
-    def LOWEST(self):
-        df = self.df
-        lowest_close = ta.MIN(df["close"], timeperiod=2)
-        lowest_low = ta.MIN(df["low"], timeperiod=2)
-        low_list = [lowest_close, lowest_low]
-        cols = ["close", "low"]
-        df = pd.DataFrame(low_list)
-        df = df.transpose()
-        df.columns = cols
-        df.reset_index(inplace=True)
-        index = int(df["close"].idxmin())
-        index2 = int(df["low"].idxmin())
-        metrics = [np.float64(df["close"].max()), df["time"].iloc[index], np.float64(
-            df["low"].max()), df["time"].iloc[index2]]
-        return metrics
+    # Lowest and highest values from the window passed
+    def LOWEST_AND_HIGHEST(self, lenght=10):
+        df = self.df        
+        highest_high = ta.MAX(df["high"], timeperiod=lenght)
+        lowest_low = ta.MIN(df["low"], timeperiod=lenght)        
+        return lowest_low[-1],highest_high[-1]    
 
     # SUPER TREND FUNCTION THAT RETURN DIRECTION OF SIGNAL
     def SUPER_TREND(self, atr_period=15, multiplier=3):

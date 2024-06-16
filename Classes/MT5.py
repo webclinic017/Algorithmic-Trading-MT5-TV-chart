@@ -1,13 +1,14 @@
-from operator import concat
-import MetaTrader5 as mt5
 import pandas as pd
 import numpy as np
 import pytz
 import mplfinance as mpl
 import datetime as dt
+import sys
+import MetaTrader5 as mt5
             
 ES_CONTINUOUS = 0x80000000
 ES_SYSTEM_REQUIRED = 0x00000001
+
 class MT5:
     
     # Define Global attributes
@@ -57,7 +58,7 @@ class MT5:
         if not mt5.initialize(login=user, server=server, password=password):            
             self.error = mt5.last_error()
             print("initialize() failed, error code =", self.error)            
-            quit()            
+            sys.exit()            
         print("Successfully Connection! \n")
         self.connection_state = True        
         
@@ -97,7 +98,8 @@ class MT5:
 
         final_string = string
         for elem in new_list:
-            final_string = concat(final_string, concat(",", elem))
+            final_string += "," + elem
+
 
         self.group_symbols = mt5.symbols_get(group=final_string)
         group_return = list()
@@ -169,20 +171,39 @@ class MT5:
         deviation = 20
                         
         price = mt5.symbol_info_tick(symbol).ask if operation == 1 else  mt5.symbol_info_tick(symbol).bid
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": symbol,
-            "volume": lot,     
-            "type": mt5.ORDER_TYPE_BUY if operation == 1 else  mt5.ORDER_TYPE_SELL,
-            "price": price,
-            "tp": price + (points) * point if operation == 1 else price - (points) * point,
-            "sl": price - (points) * point if operation == 1 else price + (points) * point,
-            "deviation": deviation,
-            #"magic": 234000,
-            "comment": comment,
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
-            }        
+        # Open position based on points
+        if len(points) == 1:
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": lot,     
+                "type": mt5.ORDER_TYPE_BUY if operation == 1 else  mt5.ORDER_TYPE_SELL,
+                "price": price,
+                "tp": price + (points) * point if operation == 1 else price - (points) * point,
+                "sl": price - (points) * point if operation == 1 else price + (points) * point,
+                "deviation": deviation,
+                #"magic": 234000,
+                "comment": comment,
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+                }        
+        # Set SL and TP passed
+        else:
+             request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": lot,     
+                "type": mt5.ORDER_TYPE_BUY if operation == 1 else  mt5.ORDER_TYPE_SELL,
+                "price": price,
+                "tp": points[1],
+                "sl": points[0],
+                "deviation": deviation,
+                #"magic": 234000,
+                "comment": comment,
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+                }  
+            
         # send a trading request
         result = mt5.order_send(request)
         # check the execution result

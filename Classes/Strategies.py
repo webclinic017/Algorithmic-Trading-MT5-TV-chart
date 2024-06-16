@@ -1,5 +1,4 @@
 import pandas as pd
-from Classes.MT5 import MT5
 from Classes.data_operations import *
 from time import sleep
 import customtkinter
@@ -41,10 +40,13 @@ def export_signals(df,result,order,reverse,points,symbol,date_for_df,i):
     df["ID"] = symbol+"-"+date_for_df+"-"+str(points)+"live"+"-"+str(i)
     return df
 
-def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entries_per_trade,max_trades,timeFrame,flag_session,flag_position,points,lots,both_directions=False,dynamic_sl=True,reverse_entries=False):
-    TRADES_SIGNALS = []
+def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entries_per_trade,max_trades,timeFrame,flag_session,flag_position,points,lots,both_directions=False,dynamic_sl=True,reverse_entries=False,fibonacci=False):
+    point = mt5.symbol_info(symbol_to_trade).point   
+    points_value = 0
+    TRADES_SIGNALS = []    
     id = 0
     date_for_df = str(date.today())
+    fibonacci_levels = dict()
     FINAL_EMA_OPEN = EMA_OPEN_XAUUSD if symbol_to_trade == "XAUUSD" else EMA_OPEN_EURUSD
     FINAL_EMA_LH = EMA_LH_XAUUSD if symbol_to_trade == "XAUUSD" else EMA_LH_EURUSD
     max_profit_trades = int(.6 * max_trades) if max_trades != 1 else 1
@@ -60,19 +62,33 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
     while not flag_session.is_set():        
         # Position Opened
         if positions_open(conn,symbol_to_trade) and not flag_position.is_set():
-            # Active Trailling STOP with 33 %  - Apply in both directions based on entry    
-            TRAILLING_STOP(conn=conn,
-                           s=symbol_to_trade,
-                           order=entry,
-                           tickets=tickets_copy,
-                           points=points / 3,
-                           profit=target_profit,
-                           risk=risk,
-                           partial_close=partial_close,
-                           apply_both_directions=both_directions,
-                           flag_to_stop=flag_position,dynamic_sl=dynamic_sl,
-                           pnl = total_profit
-                           )
+            if fibonacci:
+                # TRAILLING STOP based onf fibonacci levels
+                TRAILLING_STOP_FIBONACCI(s=symbol_to_trade,
+                                         order=entry,
+                                         tickets=tickets_copy,
+                                         conn=conn,
+                                         levels=fibonacci_levels,
+                                         profit=target_profit,
+                                         risk=risk,
+                                         pnl=total_profit,
+                                         flag_to_stop=flag_position,
+                                         partial_close=partial_close,
+                                         dynamic_sl=dynamic_sl)
+            else:
+                # Active Trailling STOP with 33 %  - Apply in both directions based on entry    
+                TRAILLING_STOP(conn=conn,
+                            s=symbol_to_trade,
+                            order=entry,
+                            tickets=tickets_copy,
+                            points=points / 3,
+                            profit=target_profit,
+                            risk=risk,
+                            partial_close=partial_close,
+                            apply_both_directions=both_directions,
+                            flag_to_stop=flag_position,dynamic_sl=dynamic_sl,
+                            pnl = total_profit
+                            )
             check_balance = True                                   
         # If operations are alive and flag is set up to True close all positions
         if positions_open(conn,symbol_to_trade) and flag_position.is_set():  
@@ -97,8 +113,11 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
                 negative += 1                
             total_profit += profit
             last_balance = conn.account_details().equity
-            check_balance = False
-            TRADES_SIGNALS.append(export_signals(M1,result,entry,reverse_entries,points,symbol_to_trade,date_for_df,id)) 
+            check_balance = False            
+            if fibonacci:                                                
+                TRADES_SIGNALS.append(export_signals(M1,result,entry,reverse_entries,points_value,symbol_to_trade,date_for_df,id)) 
+            else:
+                TRADES_SIGNALS.append(export_signals(M1,result,entry,reverse_entries,points,symbol_to_trade,date_for_df,id)) 
         # Check if sessions needs to be closed
         if not positions_open(conn,s=symbol_to_trade):
             # Close the session if profit/loss or max entries was reached
@@ -114,18 +133,44 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
             print("Data range failed:", e)
             break
         # Avoid open positions when the profit/risk was acheived
-        if not positions_open(conn,symbol_to_trade) and (total_profit >= target_profit) or (total_profit <= risk):
+        if not positions_open(conn,symbol_to_trade) and (total_profit <= target_profit) or (total_profit >= risk):
             # Open positions if the stratgy detects entries
             position, entry = EMA_CROSSING(df=M1,offset= OFFSET, ema_open=FINAL_EMA_OPEN,ema_period= FINAL_EMA_LH,reverse=reverse_entries)        
-            if position:      
+            if position:                 
+                lowest,highest = Technical(M1).LOWEST_AND_HIGHEST(10) 
+                difference = abs(highest - lowest)
+                fibonacci_levels = {
+                    38.2: .382 * difference,
+                    50: .5 * difference,
+                    61.8: .618 * difference
+                }
                 # if reverse_entries:
                 #     entry = 0 if entry == 1 else 1
                 #entry = 0 if entry == 1 else 1 if reverse_entries else entry
                 tickets = [] 
-                tickets_copy = []               
-                print("****************** BUY ******************") if entry == 1 else print("****************** SELL ******************")                                            
+                tickets_copy = [] 
+                if entry == 1:
+                    print("****************** BUY ******************")
+                    decimal_places = len(str(mt5.symbol_info_tick(symbol_to_trade).ask).split(".")[1])
+                    entry_price = mt5.symbol_info_tick(symbol_to_trade).ask
+                    sl = round(entry_price - fibonacci_levels[38.2], decimal_places)
+                    tp = round(entry_price + fibonacci_levels[61.8], decimal_places)
+                else:
+                    print("****************** SELL ******************")   
+                    decimal_places = len(str(mt5.symbol_info_tick(symbol_to_trade).bid).split(".")[1])
+                    entry_price = mt5.symbol_info_tick(symbol_to_trade).bid
+                    sl = round(entry_price + fibonacci_levels[38.2], decimal_places)
+                    tp = round(entry_price - fibonacci_levels[61.8], decimal_places)                                               
+                
                 while len(tickets) < entries_per_trade:                    
-                    ticket = conn.open_position(symbol_to_trade, entry, lots,points)
+                    # Set SL and TP based in Fibonacci levels
+                    if fibonacci:
+                        points_value = round((max([tp,entry_price]) - min([tp,entry_price])) * (100 if symbol_to_trade == "XAUUSD" else 100_000))
+                        object.points = str(points_value)
+                        ticket = conn.open_position(symbol_to_trade, entry, lots,[sl,tp])
+                    # Set  SL and TP with user inputs
+                    else:
+                        ticket = conn.open_position(symbol_to_trade, entry, lots,points)
                     if ticket != 0:
                         tickets.append(ticket) 
                 valid_entries = False
@@ -149,7 +194,10 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
     # Export the current operations
     print(f"Profit: {total_profit}")  
     if len(TRADES_SIGNALS) > 0:
-        pd.concat(TRADES_SIGNALS).to_csv(fr"C:\Users\Moy\Documents\Python\Algorithmic Trading\HFT\backtest_data\{symbol_to_trade}-{date_for_df}-{points}.csv")     
+        if fibonacci:            
+            pd.concat(TRADES_SIGNALS).to_csv(fr"C:\Users\Moy\Documents\Python\Algorithmic Trading\HFT\backtest_data\{symbol_to_trade}-{date_for_df}-{points_value}-fibonacci.csv")     
+        else:
+            pd.concat(TRADES_SIGNALS).to_csv(fr"C:\Users\Moy\Documents\Python\Algorithmic Trading\HFT\backtest_data\{symbol_to_trade}-{date_for_df}-{points}.csv")     
 
 def EMA_CROSSING(df,offset=3, ema_open=15, ema_period=3,reverse=False,volume_filter=False,show=False):
     """

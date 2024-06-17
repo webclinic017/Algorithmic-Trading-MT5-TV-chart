@@ -172,7 +172,7 @@ class MT5:
                         
         price = mt5.symbol_info_tick(symbol).ask if operation == 1 else  mt5.symbol_info_tick(symbol).bid
         # Open position based on points
-        if len(points) == 1:
+        if type(points) is int:
             request = {
                 "action": mt5.TRADE_ACTION_DEAL,
                 "symbol": symbol,

@@ -8,7 +8,6 @@ import requests
 import tkinter as tk
 from tkinter import messagebox
 
-
 customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("assets/themes/red.json")
 #customtkinter.set_default_color_theme("dark-blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -40,12 +39,11 @@ class App(customtkinter.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
     
     def on_closing(self):
-        # This function will be called when the user tries to close the window
-        if messagebox.askokcancel("Quit", "Do you want to quit?"):
-            if not self.stop_thread_flag.is_set():
-                self.stop_session()
-            # If the user confirms, destroy the window
-            self.destroy()
+        # This function will be called when the user tries to close the window    
+        if not self.stop_thread_flag.is_set() and "active_connection" in globals():
+            self.stop_session()
+        # Destroy the window
+        self.destroy()
    
         
     # API Request
@@ -71,18 +69,21 @@ class App(customtkinter.CTk):
     
     # Stop Startegy thread
     def stop_session(self): 
-        if positions_open(self.connection,self.symbol):
+        if positions_open(self.connection):
             self.close_postions_flag.set()
             tk.messagebox.showinfo("Information","Active trades will be closed before end the session!")
             sleep(2)                                       
         self.stop_thread_flag.set()
-        self.main_frame.profit_or_loss.grid_forget()
-        self.main_frame.stop_thread.grid_forget()    
-        self.main_frame.close_trades.grid_forget()  
-        # Return button
-        self.sidebar_button_2.configure(state="enabled")
-        self.main_frame.stop_thread = customtkinter.CTkButton(self.main_frame, text="Return Strategy Screen",command= self.start_connection)
-        self.main_frame.stop_thread.grid(row=7, column=0,columnspan=2, padx=40, pady=0,sticky="ew")            
+        try:
+            self.main_frame.profit_or_loss.grid_forget()
+            self.main_frame.stop_thread.grid_forget()    
+            self.main_frame.close_trades.grid_forget()  
+            # Return button
+            self.sidebar_button_2.configure(state="enabled")
+            self.main_frame.stop_thread = customtkinter.CTkButton(self.main_frame, text="Return Strategy Screen",command= self.start_connection)
+            self.main_frame.stop_thread.grid(row=7, column=0,columnspan=2, padx=40, pady=0,sticky="ew")            
+        except:
+            pass
     # Close trades manually
     def close_entry(self):
         if positions_open(self.connection,self.symbol):
@@ -179,7 +180,7 @@ class App(customtkinter.CTk):
         self.max_trades = int(self.main_frame.max_trades_entry.get())
         self.partial_close = self.main_frame.partial_close_options.get() == "Enable"
         self.dynamic_sl = self.main_frame.dynamic_SL_menu.get() == "Enable"
-        self.reverse = self.main_frame.reverse_menu.get() == "Enable"
+        self.reverse = False #self.main_frame.reverse_menu.get() == "Enable"
         # self.reverse = self.bestparameters["reverse"]
         self.positions_entry = int(self.main_frame.positions_entry.get())    
         self.points = round(int(self.main_frame.points_entry.get()),2)

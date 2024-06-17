@@ -36,7 +36,7 @@ def side_bar(frame):
     frame.sidebar_button_1 = customtkinter.CTkButton(frame.sidebar_frame, command=frame.sidebar_button_login_event,text="Start")
     frame.sidebar_button_1.grid(row=2, column=0, padx=20, pady=(280,10))
     
-    frame.sidebar_button_2 = customtkinter.CTkButton(frame.sidebar_frame, command=frame.sidebar_button_event,text="Help")
+    frame.sidebar_button_2 = customtkinter.CTkButton(frame.sidebar_frame, command=frame.sidebar_button_event,text="Disclaimer")
     frame.sidebar_button_2.grid(row=3, column=0, padx=20, pady=10)          
 
 
@@ -213,11 +213,23 @@ def start_strategy_mt5_screen(frame):
     using a two-column layout.
     """
     
+    def set_lots():
+        if frame.main_frame.fibonacci_options.get() == "Disable":
+            if frame.main_frame.symbol == "XAUUSD":
+                frame.lots.set(str(round(lots_value / 3, 2)))                
+            else:
+                frame.lots.set(str(lots_value))
+        else:
+            if frame.main_frame.symbol == "XAUUSD":
+                frame.lots.set(str(round(lots_value / 1.5, 2)))                
+            else:
+                frame.lots.set(str(lots_value * 2))
+    
     def display_points(selection):
         if selection == "Enable":
             frame.main_frame.points_label.grid_forget()
-            frame.main_frame.points_entry.grid_forget()                
-        elif selection == "Disable":
+            frame.main_frame.points_entry.grid_forget()              
+        elif selection == "Disable":            
             # Point for TP/SL
             frame.main_frame.points_label = customtkinter.CTkLabel(frame.main_frame,
                                                                 text="Points to TP/SL:", anchor="e")
@@ -228,16 +240,17 @@ def start_strategy_mt5_screen(frame):
             frame.main_frame.points_entry.grid(row=11, column=1, padx=PADX, pady=PADY, sticky="ew")        
             frame.main_frame.points_entry.configure(validate='key', validatecommand=(frame.register(validate_numeric_input), '%d', '%S'))
             frame.main_frame.message.grid(row=1, column=0, columnspan=2, padx=(20, 20), pady=(20, 10), sticky="ew")
-            frame.main_frame.start_strategy.grid(row=14, column=0, columnspan=2, padx=150, pady=15, sticky="ew")
-    
+            frame.main_frame.start_strategy.grid(row=13, column=0, columnspan=2, padx=150, pady=15, sticky="ew")        
+        
     def symbol_adjustments(selection):
         if selection == "XAUUSD":
-            frame.lots.set(str(round(lots_value / 3, 2)))
+            frame.lots.set(str(round(lots_value / 3, 2)))            
             frame.points.set(str(points("XAUUSD")))
         else:
             frame.lots.set(str(lots_value))
             frame.points.set(str(points(".")))
-                                
+        
+        
     PADX = (0,40)
     PADY = 2.5
     connection = frame.connection    
@@ -256,6 +269,7 @@ def start_strategy_mt5_screen(frame):
     set_up_main_frame(frame)
     frame.main_frame.grid_rowconfigure(0, weight=1)
     frame.main_frame.grid_columnconfigure(0, weight=1)
+    frame.main_frame.grid_rowconfigure(13, weight=2)
     
     if len(symbols) != 0:       
         
@@ -353,17 +367,17 @@ def start_strategy_mt5_screen(frame):
         frame.main_frame.dynamic_SL_menu = customtkinter.CTkOptionMenu(frame.main_frame,   
                                                                        values=["Enable", "Disable"])
         frame.main_frame.dynamic_SL_menu.grid(row=12, column=1, padx=PADX, pady=PADY,sticky="ew")
-        # Reverse entries
-        frame.main_frame.reverse_label = customtkinter.CTkLabel(frame.main_frame,
-                                                                        text="Reverse entries:", anchor="e")
-        frame.main_frame.reverse_label.grid(row=13, column=0, padx=PADX, pady=PADY)
-        frame.main_frame.reverse_menu = customtkinter.CTkOptionMenu(frame.main_frame,   
-                                                                       values=["Enable", "Disable"])
-        frame.main_frame.reverse_menu.grid(row=13, column=1, padx=PADX,sticky="ew")
+        # # Reverse entries
+        # frame.main_frame.reverse_label = customtkinter.CTkLabel(frame.main_frame,
+        #                                                                 text="Reverse entries:", anchor="e")
+        # frame.main_frame.reverse_label.grid(row=13, column=0, padx=PADX, pady=PADY)
+        # frame.main_frame.reverse_menu = customtkinter.CTkOptionMenu(frame.main_frame,   
+        #                                                                values=["Enable", "Disable"])
+        # frame.main_frame.reverse_menu.grid(row=13, column=1, padx=PADX,sticky="ew")
                                                     
         # START button 
         frame.main_frame.start_strategy = customtkinter.CTkButton(frame.main_frame, text="START", command=frame.start_strategy)
-        frame.main_frame.start_strategy.grid(row=14, column=0, columnspan=2, padx=150, pady=15, sticky="ew")
+        frame.main_frame.start_strategy.grid(row=13, column=0, columnspan=2, padx=120, pady=10, sticky="ew")
         
         # Default values
         frame.main_frame.risk_entry.insert(0, frame.risk.get())  
@@ -371,7 +385,7 @@ def start_strategy_mt5_screen(frame):
         frame.main_frame.gain_entry.insert(0, frame.target_profit.get())
         frame.main_frame.max_trades_entry.insert(0, frame.max_trades.get())
         frame.main_frame.partial_close_options.set("Enable")        
-        frame.main_frame.reverse_menu.set("Disable")
+        #frame.main_frame.reverse_menu.set("Disable")
         frame.main_frame.dynamic_SL_menu.set("Enable")
         frame.main_frame.fibonacci_options.set("Disable")
 

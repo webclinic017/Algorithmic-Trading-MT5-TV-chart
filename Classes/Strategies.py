@@ -3,6 +3,7 @@ from Classes.data_operations import *
 from time import sleep
 import customtkinter
 from datetime import date
+from random import choice,randint
 
 # Parameteters for strategy (not modify)
 OFFSET = 2
@@ -25,11 +26,11 @@ ENTRIES_PER_SIGNAL = 4
 
 
 # Stragies created by my own
-def positions_open(conn,s):
+def positions_open(conn,s=None):
     """
         Check if exists positions opened in the symbol
-    """
-    return not conn.get_positions(0,s=s).empty
+    """    
+    return not conn.get_positions(0).empty if s is None else not conn.get_positions(0,s=s).empty
 
 def export_signals(df,result,order,reverse,points,symbol,date_for_df,i):    
     df["result"] = result
@@ -37,8 +38,9 @@ def export_signals(df,result,order,reverse,points,symbol,date_for_df,i):
     df["points"] = points
     df["symbol"] = symbol
     df["order"] = order
-    df["ID"] = symbol+"-"+date_for_df+"-"+str(points)+"live"+"-"+str(i)
-    return df
+    id_rand = randint(1,100)
+    df["ID"] = symbol+"-"+date_for_df+"-"+str(points)+"live"+"-"+str(i)+id_rand
+    return df,id_rand
 
 def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entries_per_trade,max_trades,timeFrame,flag_session,flag_position,points,lots,both_directions=False,dynamic_sl=True,reverse_entries=False,fibonacci=False):
     point = mt5.symbol_info(symbol_to_trade).point   
@@ -114,10 +116,12 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
             total_profit += profit
             last_balance = conn.account_details().equity
             check_balance = False            
-            if fibonacci:                                                
-                TRADES_SIGNALS.append(export_signals(M1,result,entry,reverse_entries,points_value,symbol_to_trade,date_for_df,id)) 
+            if fibonacci:    
+                df,id = export_signals(M1,result,entry,random_reverse,int(points_value),symbol_to_trade,date_for_df,id)                                            
+                TRADES_SIGNALS.append(df) 
             else:
-                TRADES_SIGNALS.append(export_signals(M1,result,entry,reverse_entries,points,symbol_to_trade,date_for_df,id)) 
+                df,id = export_signals(M1,result,entry,random_reverse,points,symbol_to_trade,date_for_df,id)
+                TRADES_SIGNALS.append(df) 
         # Check if sessions needs to be closed
         if not positions_open(conn,s=symbol_to_trade):
             # Close the session if profit/loss or max entries was reached
@@ -135,12 +139,14 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
         # Avoid open positions when the profit/risk was acheived
         if not positions_open(conn,symbol_to_trade) and (total_profit <= target_profit) or (total_profit >= risk):
             # Open positions if the stratgy detects entries
-            position, entry = EMA_CROSSING(df=M1,offset= OFFSET, ema_open=FINAL_EMA_OPEN,ema_period= FINAL_EMA_LH,reverse=reverse_entries)        
+            random_reverse = choice([True,True,False,False]) if symbol_to_trade == "XAUUSD" else choice([True,True,False,False,False])
+            position, entry = EMA_CROSSING(df=M1,offset= OFFSET, ema_open=FINAL_EMA_OPEN,ema_period= FINAL_EMA_LH,reverse=random_reverse)        
             if position:                 
                 lowest,highest = Technical(M1).LOWEST_AND_HIGHEST(10) 
                 difference = abs(highest - lowest)
                 fibonacci_levels = {
-                    38.2: .382 * difference,
+                    23.6: .236 * difference,
+                    38.2: .382 * difference,        
                     50: .5 * difference,
                     61.8: .618 * difference
                 }
@@ -194,10 +200,10 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
     # Export the current operations
     print(f"Profit: {total_profit}")  
     if len(TRADES_SIGNALS) > 0:
-        if fibonacci:            
-            pd.concat(TRADES_SIGNALS).to_csv(fr"C:\Users\Moy\Documents\Python\Algorithmic Trading\HFT\backtest_data\{symbol_to_trade}-{date_for_df}-{points_value}-fibonacci.csv")     
+        if fibonacci:                
+            pd.concat(TRADES_SIGNALS).to_csv(fr"C:\Users\Moy\Documents\Python\Algorithmic Trading\HFT\backtest_data\{symbol_to_trade}-{date_for_df}-{points_value}-fibonacci-{id}.csv")     
         else:
-            pd.concat(TRADES_SIGNALS).to_csv(fr"C:\Users\Moy\Documents\Python\Algorithmic Trading\HFT\backtest_data\{symbol_to_trade}-{date_for_df}-{points}.csv")     
+            pd.concat(TRADES_SIGNALS).to_csv(fr"C:\Users\Moy\Documents\Python\Algorithmic Trading\HFT\backtest_data\{symbol_to_trade}-{date_for_df}-{points}-{id}.csv")     
 
 def EMA_CROSSING(df,offset=3, ema_open=15, ema_period=3,reverse=False,volume_filter=False,show=False):
     """

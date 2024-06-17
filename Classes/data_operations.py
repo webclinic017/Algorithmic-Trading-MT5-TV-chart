@@ -196,10 +196,10 @@ def TRAILLING_STOP_FIBONACCI(s,order,tickets,conn,levels,profit,risk,pnl,flag_to
         price_open = df["price_open"].iloc[0]                     
     # Calculate the intermediates levels
     if order == 1:        
-        tp1 = round(price_open + levels[38.2], decimal_places)
+        tp1 = round(price_open + levels[23.6], decimal_places)
         tp2 = round(price_open + levels[50], decimal_places)        
     else:
-        tp1 = round(price_open - levels[38.2], decimal_places)    
+        tp1 = round(price_open - levels[23.6], decimal_places)    
         tp2 = round(price_open - levels[50], decimal_places)   
     # Define SL values to use once the tp are reached
     sl1 = price_open

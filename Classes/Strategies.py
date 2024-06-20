@@ -39,7 +39,7 @@ def export_signals(df,result,order,reverse,points,symbol,date_for_df,i):
     df["symbol"] = symbol
     df["order"] = order
     id_rand = randint(1,100)
-    df["ID"] = symbol+"-"+date_for_df+"-"+str(points)+"live"+"-"+str(i)+id_rand
+    df["ID"] = symbol+"-"+date_for_df+"-"+str(points)+"live"+"-"+str(i)+str(id_rand)
     return df,id_rand
 
 def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entries_per_trade,max_trades,timeFrame,flag_session,flag_position,points,lots,both_directions=False,dynamic_sl=True,reverse_entries=False,fibonacci=False):

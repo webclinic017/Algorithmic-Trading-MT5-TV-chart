@@ -4,7 +4,7 @@ from time import sleep
 import customtkinter
 from datetime import date
 from random import choice,randint
-
+from Classes.randomForest import inputs_for_random_forest,get_prediction
 # Parameteters for strategy (not modify)
 OFFSET = 2
 CHOP_LIMIT = 50.24
@@ -42,7 +42,7 @@ def export_signals(df,result,order,reverse,points,symbol,date_for_df,i):
     df["ID"] = symbol+"-"+date_for_df+"-"+str(points)+"live"+"-"+str(i)+str(id_rand)
     return df,id_rand
 
-def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entries_per_trade,max_trades,timeFrame,flag_session,flag_position,points,lots,both_directions=False,dynamic_sl=True,reverse_entries=False,fibonacci=False):
+def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entries_per_trade,max_trades,timeFrame,flag_session,flag_position,points,lots,both_directions=False,dynamic_sl=True,randomForest=False,fibonacci=False):
     point = mt5.symbol_info(symbol_to_trade).point   
     points_value = 0
     TRADES_SIGNALS = []    
@@ -117,10 +117,10 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
             last_balance = conn.account_details().equity
             check_balance = False            
             if fibonacci:    
-                df,id = export_signals(M1,result,entry,random_reverse,int(points_value),symbol_to_trade,date_for_df,id)                                            
+                df,id = export_signals(M1,result,entry,prediction_reverse,int(points_value),symbol_to_trade,date_for_df,id)                                            
                 TRADES_SIGNALS.append(df) 
             else:
-                df,id = export_signals(M1,result,entry,random_reverse,points,symbol_to_trade,date_for_df,id)
+                df,id = export_signals(M1,result,entry,prediction_reverse,points,symbol_to_trade,date_for_df,id)
                 TRADES_SIGNALS.append(df) 
         # Check if sessions needs to be closed
         if not positions_open(conn,s=symbol_to_trade):
@@ -138,9 +138,8 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
             break
         # Avoid open positions when the profit/risk was acheived
         if not positions_open(conn,symbol_to_trade) and (total_profit <= target_profit) or (total_profit >= risk):
-            # Open positions if the stratgy detects entries
-            random_reverse = choice([True,True,False,False]) if symbol_to_trade == "XAUUSD" else choice([True,True,False,False,False])
-            position, entry = EMA_CROSSING(df=M1,offset= OFFSET, ema_open=FINAL_EMA_OPEN,ema_period= FINAL_EMA_LH,reverse=random_reverse)        
+            # Open positions if the stratgy detects entries            
+            position, entry = EMA_CROSSING(df=M1,offset= OFFSET, ema_open=FINAL_EMA_OPEN,ema_period= FINAL_EMA_LH,reverse=False)        
             if position:                 
                 lowest,highest = Technical(M1).LOWEST_AND_HIGHEST(10) 
                 difference = abs(highest - lowest)
@@ -150,24 +149,37 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
                     50: .5 * difference,
                     61.8: .618 * difference
                 }
-                # if reverse_entries:
-                #     entry = 0 if entry == 1 else 1
-                #entry = 0 if entry == 1 else 1 if reverse_entries else entry
+                #random_reverse = choice([True,True,False,False]) if symbol_to_trade == "XAUUSD" else choice([True,True,False,False,False])
+                flag_randomForest = False
+                prediction_reverse = False
+                while True:
+                    if entry == 1:
+                        print("****************** BUY ******************")
+                        decimal_places = len(str(mt5.symbol_info_tick(symbol_to_trade).ask).split(".")[1])
+                        entry_price = mt5.symbol_info_tick(symbol_to_trade).ask
+                        sl = round(entry_price - fibonacci_levels[38.2], decimal_places)
+                        tp = round(entry_price + fibonacci_levels[61.8], decimal_places)
+                    else:
+                        print("****************** SELL ******************")   
+                        decimal_places = len(str(mt5.symbol_info_tick(symbol_to_trade).bid).split(".")[1])
+                        entry_price = mt5.symbol_info_tick(symbol_to_trade).bid
+                        sl = round(entry_price + fibonacci_levels[38.2], decimal_places)
+                        tp = round(entry_price - fibonacci_levels[61.8], decimal_places)   
+                    # If randomForest is active
+                    if randomForest and not flag_randomForest:  
+                        points_value = round((max([tp,entry_price]) - min([tp,entry_price])) * (100 if symbol_to_trade == "XAUUSD" else 100_000))                                      
+                        data = inputs_for_random_forest(M1,entry,symbol_to_trade,points_value)  
+                        prediction =  get_prediction(data)
+                        if prediction:
+                            print("Reversed by randomForest")
+                            entry = 0 if entry == 1 else 1
+                            flag_randomForest = True
+                            prediction_reverse = prediction
+                    else:
+                        break
                 tickets = [] 
                 tickets_copy = [] 
-                if entry == 1:
-                    print("****************** BUY ******************")
-                    decimal_places = len(str(mt5.symbol_info_tick(symbol_to_trade).ask).split(".")[1])
-                    entry_price = mt5.symbol_info_tick(symbol_to_trade).ask
-                    sl = round(entry_price - fibonacci_levels[38.2], decimal_places)
-                    tp = round(entry_price + fibonacci_levels[61.8], decimal_places)
-                else:
-                    print("****************** SELL ******************")   
-                    decimal_places = len(str(mt5.symbol_info_tick(symbol_to_trade).bid).split(".")[1])
-                    entry_price = mt5.symbol_info_tick(symbol_to_trade).bid
-                    sl = round(entry_price + fibonacci_levels[38.2], decimal_places)
-                    tp = round(entry_price - fibonacci_levels[61.8], decimal_places)                                               
-                
+                                                                           
                 while len(tickets) < entries_per_trade:                    
                     # Set SL and TP based in Fibonacci levels
                     if fibonacci:

@@ -2,7 +2,7 @@ import pickle
 import pandas as pd
 
 # Load the model 
-with open("Classes/Models/random_forest_95_model-2024-06-14.pkl", 'rb') as file:
+with open("Classes/Models/random_forest_59_model-2024-06-30-EURUSD-hist.pkl", 'rb') as file:
     loaded_model = pickle.load(file)
 
 def inputs_for_random_forest(df,order,symbol,points):

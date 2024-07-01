@@ -39,7 +39,6 @@ def side_bar(frame):
     frame.sidebar_button_2 = customtkinter.CTkButton(frame.sidebar_frame, command=frame.sidebar_button_event,text="Disclaimer")
     frame.sidebar_button_2.grid(row=3, column=0, padx=20, pady=10)          
 
-
 def login_for_license_screen(frame):
     """
         Display the screen to validate if the user has an active license
@@ -93,8 +92,7 @@ def help_screen(frame):
     my_image = customtkinter.CTkImage(light_image=Image.open(r"C:\Users\Moy\Documents\Python\Algorithmic Trading\HFT\assets\images\information.png"),size=(125, 125))
     image_label = customtkinter.CTkLabel(frame.main_frame, image=my_image, text="")  # display image with a CTkLabel
     image_label.grid(row=2,column=0, sticky="nsew",padx=(15, 15), pady=(0, 60))
-       
-                      
+                             
 def connection_mt5_screen(frame):
     """
         Display the screen with the fields to connect to MT5
@@ -404,3 +402,104 @@ def start_strategy_mt5_screen(frame):
         my_image = customtkinter.CTkImage(light_image=Image.open(r"assets\images\research.png"), size=(250, 250))
         image_label = customtkinter.CTkLabel(frame.main_frame, image=my_image, text="")
         image_label.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
+   
+def start_strategy_in_backtest_screen(frame):
+    """
+    Display the screen with the current symbols and parameters to start the strategy
+    using a two-column layout.
+    """
+    def symbol_adjustments(selection):
+        if selection == "XAUUSD":          
+            frame.points.set(str(points("XAUUSD")))
+        else:            
+            frame.points.set(str(points(".")))
+            
+    def display_points(selection):
+        if selection == "Enable":
+            frame.main_frame.points_label.grid_forget()
+            frame.main_frame.points_entry.grid_forget()              
+        elif selection == "Disable":            
+            # Point for TP/SL
+            frame.main_frame.points_label = customtkinter.CTkLabel(frame.main_frame,
+                                                                text="Points to TP/SL:", anchor="e")
+            frame.main_frame.points_label.grid(row=11, column=0, padx=PADX, pady=PADY)
+            frame.main_frame.points_entry = customtkinter.CTkEntry(frame.main_frame,
+                                                                placeholder_text="Points TP/SL",
+                                                                textvariable=frame.points)
+            frame.main_frame.points_entry.grid(row=11, column=1, padx=PADX, pady=PADY, sticky="ew")        
+            frame.main_frame.points_entry.configure(validate='key', validatecommand=(frame.register(validate_numeric_input), '%d', '%S'))
+            frame.main_frame.message.grid(row=1, column=0, columnspan=2, padx=(20, 20), pady=(20, 10), sticky="ew")
+            frame.main_frame.start_strategy.grid(row=13, column=0, columnspan=2, padx=150, pady=15, sticky="ew")         
+        
+        
+    PADX = (0,40)
+    PADY = 2.5
+    connection = frame.connection    
+    symbols = connection.display_symbols(["EURUSD", "XAUUSD"], 100)
+    
+    # Define Tkinter variables to update the GUI    
+    points = lambda x: TARGET_POINTS_XAUUSD if x == "XAUUSD" else TARGET_POINTS_EURUSD
+    frame.points = tk.StringVar(value=str(points(".")))     
+    
+    set_up_main_frame(frame)
+    frame.main_frame.grid_rowconfigure(0, weight=1)
+    frame.main_frame.grid_columnconfigure(0, weight=1)
+    frame.main_frame.grid_rowconfigure(13, weight=2)
+    
+        
+    # Configure grid for two columns
+    frame.main_frame.grid_columnconfigure((0, 1), weight=1, uniform="column")        
+    # Initialize Strategy Title
+    frame.main_frame.message = customtkinter.CTkLabel(frame.main_frame,
+                                                                        text="Backtest Strategy",
+                                                                        font=customtkinter.CTkFont(size=22, weight="bold"))
+    frame.main_frame.message.grid(row=1, column=0, columnspan=2, padx=(20, 20), pady=(20, 10), sticky="ew")
+
+    # Instructions Text
+    frame.main_frame.message_2 = customtkinter.CTkLabel(frame.main_frame,
+                                                                            text="Please enter your parameters to simulate the strategy",
+                                                                            font=customtkinter.CTkFont(size=15, weight="normal"))
+    frame.main_frame.message_2.grid(row=2, column=0, columnspan=2, padx=(10, 10), pady=(0, 6), sticky="ew")
+    
+    # Symbol Selector
+    frame.main_frame.symbol = customtkinter.CTkLabel(frame.main_frame, text="Symbol:", anchor="e")
+    frame.main_frame.symbol.grid(row=3, column=0, padx=PADX, pady=PADY)
+
+    frame.main_frame.symbols_options = customtkinter.CTkOptionMenu(frame.main_frame,
+                                                                                    values=[symbol.name for symbol in symbols],
+                                                                                    command=symbol_adjustments)
+    frame.main_frame.symbols_options.grid(row=3, column=1, padx=PADX, pady=(10, 10), sticky="ew")
+    
+    # Number of peridos for backtest
+    frame.main_frame.periods_label = customtkinter.CTkLabel(frame.main_frame,
+                                                        text="Number of Periods:", anchor="e")
+    frame.main_frame.periods_label.grid(row=4, column=0, padx=PADX, pady=PADY)
+    frame.main_frame.periods_entry = customtkinter.CTkEntry(frame.main_frame,
+                                                        placeholder_text="# of Periods")        
+    frame.main_frame.periods_entry.grid(row=4, column=1, padx=PADX, pady=PADY,sticky="ew")
+    frame.main_frame.periods_entry.configure(validate='key', validatecommand=(frame.register(validate_numeric_input), '%d', '%S'))
+    
+    # TP/SL based on Fibonacci Levels
+    frame.main_frame.fibonacci_label = customtkinter.CTkLabel(frame.main_frame,
+                                                        text="Automatic SL/TP:", anchor="e")
+    frame.main_frame.fibonacci_label.grid(row=10, column=0, padx=PADX, pady=PADY)
+    frame.main_frame.fibonacci_options = customtkinter.CTkOptionMenu(frame.main_frame,
+                                                                                        values=["Enable", "Disable"],
+                                                                                        command=display_points) 
+    frame.main_frame.fibonacci_options.grid(row=10, column=1, padx=PADX, pady=PADY, sticky="ew")                                  
+    # Point for TP/SL
+    frame.main_frame.points_label = customtkinter.CTkLabel(frame.main_frame,
+                                                        text="Points to TP/SL:", anchor="e")
+    frame.main_frame.points_label.grid(row=11, column=0, padx=PADX, pady=PADY)
+    frame.main_frame.points_entry = customtkinter.CTkEntry(frame.main_frame,
+                                                        placeholder_text="Points TP/SL",
+                                                        textvariable=frame.points)        
+    frame.main_frame.points_entry.grid(row=11, column=1, padx=PADX, pady=PADY, sticky="ew")        
+    frame.main_frame.points_entry.configure(validate='key', validatecommand=(frame.register(validate_numeric_input), '%d', '%S'))   
+                                                
+    # START button 
+    frame.main_frame.start_strategy = customtkinter.CTkButton(frame.main_frame, text="START", command=frame.start_backtest)
+    frame.main_frame.start_strategy.grid(row=13, column=0, columnspan=2, padx=120, pady=10, sticky="ew")
+    
+    # Default values   
+    frame.main_frame.fibonacci_options.set("Disable")

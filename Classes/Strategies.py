@@ -100,7 +100,7 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
                 conn.close_position(symbol_to_trade, ticket, entry, lots, comment="Closed by limit reached")                
             check_balance = True
             # Clear the flag to avoid close the next entries
-            flag_position.clear()               
+            flag_position.clear()                           
                                              
         # Update current balance        
         if check_balance and last_balance != conn.account_details().equity:            
@@ -121,16 +121,14 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
                 TRADES_SIGNALS.append(df) 
             else:
                 df,id = export_signals(M1,result,entry,prediction_reverse,points,symbol_to_trade,date_for_df,id)
-                TRADES_SIGNALS.append(df) 
-        # Check if sessions needs to be closed
-        if not positions_open(conn,s=symbol_to_trade):
-            # Close the session if profit/loss or max entries was reached
-            if (total_profit >= target_profit) or (total_profit <= risk):
-                print(f"The session was closed automatically by {'loss' if total_profit < 0 else 'profit'} limit reached!")
-                break
-            if (positive == max_profit_trades) or (negative == max_loss_trades) or (negative + positive >= max_trades):
-                print("Maximun trades reached")
-                break
+                TRADES_SIGNALS.append(df)         
+        # Close the session if profit/loss or max entries was reached
+        if (total_profit >= target_profit) or (total_profit <= risk):
+            print(f"The session was closed automatically by {'loss' if total_profit < 0 else 'profit'} limit reached!")
+            break
+        if (positive == max_profit_trades) or (negative == max_loss_trades) or (negative + positive >= max_trades):
+            print("Maximun trades reached")
+            break
         try:            
             M1 = conn.data_range(symbol_to_trade, timeFrame, 100)
         except Exception as e:
@@ -144,6 +142,7 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
                 lowest,highest = Technical(M1).LOWEST_AND_HIGHEST(10) 
                 difference = abs(highest - lowest)
                 fibonacci_levels = {
+                    11.2: .112*difference,
                     23.6: .236 * difference,
                     38.2: .382 * difference,        
                     50: .5 * difference,
@@ -157,58 +156,70 @@ def main_loop(object,conn,symbol_to_trade,partial_close,risk,target_profit,entri
                         print("****************** BUY ******************")
                         decimal_places = len(str(mt5.symbol_info_tick(symbol_to_trade).ask).split(".")[1])
                         entry_price = mt5.symbol_info_tick(symbol_to_trade).ask
-                        sl = round(entry_price - fibonacci_levels[38.2], decimal_places)
+                        sl = round(entry_price - fibonacci_levels[23.6], decimal_places)
                         tp = round(entry_price + fibonacci_levels[61.8], decimal_places)
                     else:
                         print("****************** SELL ******************")   
                         decimal_places = len(str(mt5.symbol_info_tick(symbol_to_trade).bid).split(".")[1])
                         entry_price = mt5.symbol_info_tick(symbol_to_trade).bid
-                        sl = round(entry_price + fibonacci_levels[38.2], decimal_places)
+                        sl = round(entry_price + fibonacci_levels[23.6], decimal_places)
                         tp = round(entry_price - fibonacci_levels[61.8], decimal_places)   
+                    points_value = int((max([tp,entry_price]) - min([tp,entry_price])) * (100 if symbol_to_trade == "XAUUSD" else 100_000))                                                         
                     # If randomForest is active
-                    if randomForest and not flag_randomForest:  
-                        points_value = round((max([tp,entry_price]) - min([tp,entry_price])) * (100 if symbol_to_trade == "XAUUSD" else 100_000))                                      
+                    if randomForest and not flag_randomForest:                          
                         data = inputs_for_random_forest(M1,entry,symbol_to_trade,points_value)  
                         prediction =  get_prediction(data)
                         if prediction:
-                            print("Reversed by randomForest")
-                            entry = 0 if entry == 1 else 1
-                            flag_randomForest = True
+                            print("\tReversed by randomForest")
+                            entry = 0 if entry == 1 else 1                            
                             prediction_reverse = prediction
+                            #sleep(3)
+                        flag_randomForest = True
                     else:
                         break
                 tickets = [] 
-                tickets_copy = [] 
-                                                                           
-                while len(tickets) < entries_per_trade:                    
-                    # Set SL and TP based in Fibonacci levels
-                    if fibonacci:
-                        points_value = round((max([tp,entry_price]) - min([tp,entry_price])) * (100 if symbol_to_trade == "XAUUSD" else 100_000))
-                        object.points = str(points_value)
-                        ticket = conn.open_position(symbol_to_trade, entry, lots,[sl,tp])
-                    # Set  SL and TP with user inputs
-                    else:
-                        ticket = conn.open_position(symbol_to_trade, entry, lots,points)
-                    if ticket != 0:
-                        tickets.append(ticket) 
-                valid_entries = False
-                for ticket in tickets:
-                    if ticket != 10019:
-                        valid_entries = True
-                        tickets_copy.append(ticket)                        
-                if not valid_entries:
-                    flag_session.set()
-                    print("Please reduce the lots")                                    
+                tickets_copy = []                 
+                if fibonacci and points_value < 100 and symbol_to_trade == "XAUUSD":
+                        print("Position will be skipped")
+                        position = False
+                        break                                                           
+                else:
+                    while len(tickets) < entries_per_trade:                    
+                        # Set SL and TP based in Fibonacci levels
+                        if fibonacci:                            
+                            object.points = str(points_value)
+                            ticket = conn.open_position(symbol_to_trade, entry, lots,[sl,tp])
+                        # Set  SL and TP with user inputs
+                        else:
+                            ticket = conn.open_position(symbol_to_trade, entry, lots,points)
+                        if ticket != 0:
+                            tickets.append(ticket) 
+                    valid_entries = False
+                    for ticket in tickets:
+                        if ticket != 10019:
+                            valid_entries = True
+                            tickets_copy.append(ticket)                        
+                    if not valid_entries:
+                        flag_session.set()
+                        print("Please reduce the lots")                                    
         sleep(1)
-    
+    # Make sure to close all trades before close the session
+    if positions_open(conn,s=symbol_to_trade):        
+        tickets_to_close = conn.get_positions().ticket.values          
+        print(f"Next Trades wil be closed before close the session: {tickets_to_close}")
+        for ticket in tickets_to_close:                
+            conn.close_position(symbol_to_trade, ticket, entry, lots, comment="Closed by limit reached")
     if not flag_session.is_set():                  
         flag_session.set()
-    # Display the buttons when session is closed automactically by one condtion reached
-    object.main_frame.stop_thread.grid_forget()    
-    object.main_frame.close_trades.grid_forget()                
-    object.sidebar_button_2.configure(state="enabled")
-    object.main_frame.stop_thread = customtkinter.CTkButton(object.main_frame, text="Return Strategy Screen",command= object.start_connection)
-    object.main_frame.stop_thread.grid(row=7, column=0,columnspan=2, padx=40, pady=0,sticky="ew")                             
+    # Display the buttons when session is closed automatically by one condtion reached
+    try:        
+        object.main_frame.stop_thread.grid_forget()    
+        object.main_frame.close_trades.grid_forget()                
+        object.sidebar_button_2.configure(state="enabled")
+        object.main_frame.stop_thread = customtkinter.CTkButton(object.main_frame, text="Return Strategy Screen",command= object.start_connection)
+        object.main_frame.stop_thread.grid(row=7, column=0,columnspan=2, padx=40, pady=0,sticky="ew")                             
+    except:
+        pass
     # Export the current operations
     print(f"Profit: {total_profit}")  
     if len(TRADES_SIGNALS) > 0:

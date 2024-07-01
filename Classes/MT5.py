@@ -37,8 +37,9 @@ class MT5:
     }
     utc_from = None
     utc_to = None
-    date = None
+    date = None    
     timezone = pytz.timezone("Etc/UTC")
+    #timezone = pytz.timezone('America/Mexico_City')
     # Tuple with all the symbols
     group_symbols = mt5.symbols_get()
 
@@ -269,7 +270,8 @@ class MT5:
         rates_frame = pd.DataFrame(self.rates)
         # Convert time in seconds into the datetime format
         rates_frame['time'] = pd.to_datetime(rates_frame['time'], unit='s')
-        rates_frame = rates_frame.set_index('time')
+        rates_frame["time"] = rates_frame["time"] - pd.Timedelta(hours=9)
+        rates_frame = rates_frame.set_index('time')        
         # Plot the graph
         if not plot == 0:
             mpl.plot(rates_frame, type="candle", style="classic", title=str(symbol + " " + temp))

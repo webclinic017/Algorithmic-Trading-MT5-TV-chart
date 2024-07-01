@@ -197,24 +197,29 @@ def TRAILLING_STOP_FIBONACCI(s,order,tickets,conn,levels,profit,risk,pnl,flag_to
     # Calculate the intermediates levels
     if order == 1:        
         tp1 = round(price_open + levels[23.6], decimal_places)
-        tp2 = round(price_open + levels[50], decimal_places)        
+        tp2 = round(price_open + levels[50], decimal_places)  
+        tp3 = round(price_open + (levels[50] + levels[23.6]), decimal_places)   
+        tp_flag = round(price_open + levels[61.8], decimal_places)                       
     else:
         tp1 = round(price_open - levels[23.6], decimal_places)    
         tp2 = round(price_open - levels[50], decimal_places)   
-    # Define SL values to use once the tp are reached
-    sl1 = price_open
+        tp3 = round(price_open - (levels[50] + levels[23.6]), decimal_places)            
+        tp_flag = round(price_open - levels[61.8], decimal_places)                            
+    # Define SL values to use once the tp are reached    
     sl2 = tp1
     tp1_triggered = False
     tp2_triggered = False
+    sl1_triggered = False
     tp1_partial = False
     tp2_partial = False
+    sl1_partial = False
     # Loop until the trade is closed
     while not flag_to_stop.is_set() and df.shape[0] > 0:
         current_price =  conn.data_range(s, "M1", 1)["close"].iloc[0]      
         current_pl = conn.account_details().profit + pnl
         try: 
             # If partial close was enabled close one trade per case
-            if partial_close and (not tp1_partial or not tp2_partial):            
+            if partial_close and (not tp1_partial or not tp2_partial or not sl1_partial):            
                 if tp1_triggered and not tp1_partial:
                     tp1_partial = True
                     if len(tickets) > 1:
@@ -229,32 +234,39 @@ def TRAILLING_STOP_FIBONACCI(s,order,tickets,conn,levels,profit,risk,pnl,flag_to
                         if ticket_to_close != 10019:          
                             conn.close_position(s, ticket_to_close, order, volume, comment="Partial Close")                                                                                    
                         print("Partial Close") 
+                elif sl1_triggered and not sl1_partial:
+                    sl1_partial = True
+                    if len(tickets) > 1:
+                        ticket_to_close = tickets.pop()                                    
+                        if ticket_to_close != 10019:          
+                            conn.close_position(s, ticket_to_close, order, volume, comment="Partial Close")                                                                                    
+                        print("Partial Close") 
             # Update the TP/SL if dynamic Sl was enabled
             if dynamic_sl:                            
                 # TP1 -> BUY signals
                 if order == 1 and current_price >= tp1 and not tp1_triggered:                
                     for ticket in tickets:
                         if ticket != 10019:
-                            modify(ticket,sl1,tp)
+                            modify(ticket,price_open,tp)
                     tp1_triggered = True
                 # TP2 -> BUY signals
                 elif order == 1 and current_price >= tp2 and not tp2_triggered:                                
                     for ticket in tickets:
                         if ticket != 10019:
-                            modify(ticket,sl2,tp)
-                    tp2_triggered = True
+                            modify(ticket,sl2,tp3)
+                    tp2_triggered = True             
                 # TP1 -> SELL signals
                 elif order == 0 and current_price <= tp1 and not tp1_triggered:                                
                     for ticket in tickets:
                         if ticket != 10019:
-                            modify(ticket,sl1,tp)                        
+                            modify(ticket,price_open,tp)                        
                     tp1_triggered = True
                 # TP2 -> SELL signals
                 elif order == 0 and current_price <= tp2 and not tp2_triggered:                                
                     for ticket in tickets:
                         if ticket != 10019:
-                            modify(ticket,sl2,tp)                        
-                    tp2_triggered = True                                                                                            
+                            modify(ticket,sl2,tp3)                        
+                    tp2_triggered = True                                                                                                              
         except Exception as e:
             print(e)
         # Check if the risk/profit is reached in active order close trades and close session
@@ -263,7 +275,8 @@ def TRAILLING_STOP_FIBONACCI(s,order,tickets,conn,levels,profit,risk,pnl,flag_to
             flag_to_stop.set()                        
         df = conn.get_positions(0,s) 
         sleep(1)     
-    print("Position Closed")                
+    if df.shape[0] == 0:
+        print("Position Closed")                
 # Check for Crossing betewen the 2 MA provided
 def CROSSING(first_series, second_series, crossing):
     """"

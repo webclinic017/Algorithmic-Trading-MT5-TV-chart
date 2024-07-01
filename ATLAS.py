@@ -2,7 +2,7 @@ import customtkinter
 from Classes.components import *
 from Classes.MT5 import MT5
 from Classes.Strategies import main_loop
-from Classes.backtest import optimize_strategy
+from charts import *
 import threading
 import requests
 import tkinter as tk
@@ -42,6 +42,8 @@ class App(customtkinter.CTk):
         # This function will be called when the user tries to close the window    
         if not self.stop_thread_flag.is_set() and "active_connection" in globals():
             self.stop_session()
+        else:
+            self.stop_thread_flag.set()
         # Destroy the window
         self.destroy()
    
@@ -122,8 +124,7 @@ class App(customtkinter.CTk):
     # MT5 Triggers
     def start_connection(self):
         if "active_connection" in globals():
-            start_strategy_mt5_screen(self)
-            # fine_tunning_strategy(self)
+            start_strategy_mt5_screen(self)            
         else:
             # Uncomment once you deploy
             # self.user_mt5 = int(self.main_frame.account_number.get())
@@ -137,8 +138,8 @@ class App(customtkinter.CTk):
                 if self.connection.connection_state: 
                     global active_connection
                     active_connection = True      
-                    start_strategy_mt5_screen(self)
-                    # fine_tunning_strategy(self)                
+                    start_strategy_mt5_screen(self)                               
+                    #start_strategy_in_backtest_screen(self)
                     
             except Exception as e:
                 # Display screen error with a message
@@ -147,31 +148,7 @@ class App(customtkinter.CTk):
                             title="Connection Failed",
                             message_1="Please verify next things before trying to connect again:",
                             message_2=f"-Make sure you have installed MT5 in your computer.\n-Valid credentials from a MT5 account.\n-Internet connection.\n-If your problem persist please contact us for assistance.\n{e}",
-                            command_to_trigger=self.back_main_screen_event)
-    
-    def start_optimization(self):
-        self.main_frame.start_strategy.grid_forget()
-        self.main_frame.symbols_options.configure(state="disabled")
-        # Show the progress bar        
-        self.main_frame.progress_bar = customtkinter.CTkProgressBar(self.main_frame)
-        self.main_frame.progress_bar.configure(mode="indeterminate")
-        self.main_frame.progress_bar.grid(row=3, column=0, columnspan=2, padx=(20, 20), pady=(10, 10), sticky="ew")
-        self.main_frame.progress_bar.set(0)
-        self.main_frame.progress_bar.start()
-        # Run the optimization in a separate thread            
-        self.optimization_thread = threading.Thread(target=self.optimize_and_update).start()
-        
-
-    def optimize_and_update(self):
-        self.symbol = self.main_frame.symbols_options.get()
-        self.bestparameters = optimize_strategy(self.connection, 100, self.symbol)
-        self.points = round(int(self.bestparameters["best_points"]), 2)
-        self.reverse = self.bestparameters["reverse"]        
-        # Stop the progress bar and hide it
-        self.main_frame.progress_bar.stop()
-        self.main_frame.progress_bar.grid_forget()    
-        # Call the next screen function
-        # start_strategy_mt5_screen(self)
+                            command_to_trigger=self.back_main_screen_event)        
         
     def start_strategy(self):                
         self.symbol = self.main_frame.symbols_options.get()
@@ -180,11 +157,9 @@ class App(customtkinter.CTk):
         self.max_trades = int(self.main_frame.max_trades_entry.get())
         self.partial_close = self.main_frame.partial_close_options.get() == "Enable"
         self.dynamic_sl = self.main_frame.dynamic_SL_menu.get() == "Enable"
-        self.reverse = False #self.main_frame.reverse_menu.get() == "Enable"
-        # self.reverse = self.bestparameters["reverse"]
+        self.reverse = True #self.main_frame.reverse_menu.get() == "Enable"    
         self.positions_entry = int(self.main_frame.positions_entry.get())    
-        self.points = round(int(self.main_frame.points_entry.get()),2)
-        # self.points = round(int(self.bestparameters["best_points"]),2)            
+        self.points = round(int(self.main_frame.points_entry.get()),2)        
         self.lots = float(self.main_frame.lots_entry.get())  
         self.fibonacci = self.main_frame.fibonacci_options.get() == "Enable"
         if self.stop_thread_flag.is_set():
@@ -210,11 +185,40 @@ class App(customtkinter.CTk):
                                                       self.fibonacci                                                    
                                                       ))             
         
-        strategy_running_screen(self)                
-            
-       
-    
+        strategy_running_screen(self)       
+                 
+    def start_backtest(self):
+        self.symbol = self.main_frame.symbols_options.get()        
+        # Default value
+        self.reverse = True       
+        self.points = round(int(self.main_frame.points_entry.get()),2)             
+        self.fibonacci = self.main_frame.fibonacci_options.get() == "Enable"
+        self.periods = self.main_frame.periods_entry.get()        
+        
+        # Start backtest to get the trades
+        trades, win_rate = execute_backtest(connection=self.connection,
+                                            symbol=self.symbol,
+                                            n_periods=int(self.periods),
+                                            points=self.points,
+                                            automatic_points=self.fibonacci,
+                                            use_random_forest=True,
+                                            volume_filter=False,
+                                            reverse_entries=False
+                                            )    
+        # Initialize window    
+        chart = Chart(inner_width=.8,maximize=True,on_top=True,title="ATLAS - Backtesting")        
+        chart.layout(background_color='#090008', text_color='#FFFFFF', font_size=16,
+                    font_family='Helvetica')    
+        chart.watermark('XAUUSD', color='rgba(180, 180, 240, 0.5)')
 
+        chart.crosshair(mode='normal', vert_color='#FFFFFF', vert_style='dotted',
+                        horz_color='#FFFFFF', horz_style='dotted')
+        chart.legend(visible=True, font_size=14)           
+                                    
+        table,table_result = generate_tables_of_trades()       
+        
+        chart.show(block=True)   
+        
 if __name__ == "__main__":
     app = App()    
     app.mainloop()
